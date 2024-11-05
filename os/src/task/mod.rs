@@ -14,9 +14,10 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
-use crate::config::MAX_APP_NUM;
+use crate::config::{MAX_APP_NUM, MAX_SYSCALL_NUM};
 use crate::loader::{get_num_app, init_app_cx};
 use crate::sync::UPSafeCell;
+use crate::timer::get_time_ms;
 use lazy_static::*;
 use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
@@ -54,6 +55,9 @@ lazy_static! {
         let mut tasks = [TaskControlBlock {
             task_cx: TaskContext::zero_init(),
             task_status: TaskStatus::UnInit,
+            syscall_times: [0;MAX_SYSCALL_NUM],
+            is_scheduled: false,
+            first_scheduled_time: 0,
         }; MAX_APP_NUM];
         for (i, task) in tasks.iter_mut().enumerate() {
             task.task_cx = TaskContext::goto_restore(init_app_cx(i));
@@ -135,6 +139,39 @@ impl TaskManager {
             panic!("All applications completed!");
         }
     }
+
+    //Todo
+    fn get_current_status(&self) -> TaskStatus {
+        let inner = self.inner.exclusive_access();
+        inner.tasks[inner.current_task].task_status
+    }
+    /// TODO
+    fn current_schedule_marking(&self) {
+        let mut inner = self.inner.exclusive_access();
+        let curr_task_id = inner.current_task;
+        let current_task = &mut inner.tasks[curr_task_id];
+        if !current_task.is_scheduled {
+            current_task.is_scheduled = true;
+            current_task.first_scheduled_time = get_time_ms();
+        }
+    }
+    /// TODO
+    fn record_this_call(&self, syscall_id: usize) {
+        let mut inner = self.inner.exclusive_access();
+        let curr_task_id = inner.current_task;
+        inner.tasks[curr_task_id].syscall_times[syscall_id] += 1;
+    }
+    /// 获取当前任务的系统调用次数
+    pub fn get_currtask_syscall_time(&self) -> [u32; MAX_SYSCALL_NUM] {
+        let inner = self.inner.exclusive_access();
+        inner.tasks[inner.current_task].syscall_times
+    }
+    /// TODO
+    pub fn get_currtask_first_scheduled_time(&self) -> usize {
+        let inner = self.inner.exclusive_access();
+        inner.tasks[inner.current_task].first_scheduled_time
+    }
+
 }
 
 /// Run the first task in task list.
@@ -168,4 +205,25 @@ pub fn suspend_current_and_run_next() {
 pub fn exit_current_and_run_next() {
     mark_current_exited();
     run_next_task();
+}
+
+/// TODO
+pub fn get_current_status() -> TaskStatus {
+    TASK_MANAGER.get_current_status()
+}
+/// TODO
+pub fn schedule_marking() {
+    TASK_MANAGER.current_schedule_marking();
+}
+/// TODO
+pub fn record_this_call(_syscall_id: usize) {
+    TASK_MANAGER.record_this_call(_syscall_id);
+}
+/// TODO
+pub fn get_currtask_syscall_time() -> [u32; MAX_SYSCALL_NUM] {
+    TASK_MANAGER.get_currtask_syscall_time()
+}
+/// TODO
+pub fn get_currtask_first_scheduled_time() -> usize {
+    TASK_MANAGER.get_currtask_first_scheduled_time()
 }

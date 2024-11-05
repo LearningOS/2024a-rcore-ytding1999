@@ -1,8 +1,8 @@
 //! Process management syscalls
 use crate::{
     config::MAX_SYSCALL_NUM,
-    task::{exit_current_and_run_next, suspend_current_and_run_next, TaskStatus},
-    timer::get_time_us,
+    task::*,
+    timer::{get_time_ms, get_time_us},
 };
 
 #[repr(C)]
@@ -53,5 +53,19 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
 /// YOUR JOB: Finish sys_task_info to pass testcases
 pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
     trace!("kernel: sys_task_info");
-    -1
+    unsafe {
+        let task_info = &mut *_ti;
+
+        task_info.status = get_current_status();
+        task_info.syscall_times = get_currtask_syscall_time();
+        task_info.time = get_time_ms() - get_currtask_first_scheduled_time();
+    }
+    0
+}
+
+pub fn load_initial_info(syscall_id: usize) {
+    //如果没被调用过：is_scheduled == false,改成true，并记录第一次被调度
+    schedule_marking();
+    //记录调用种类和次数
+    record_this_call(syscall_id);
 }
