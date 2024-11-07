@@ -43,6 +43,17 @@ pub fn sys_yield() -> isize {
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
 pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
     trace!("kernel: sys_get_time");
+    if _ts.is_null() {
+        return -1;
+    }
+    let time = get_time_in_us();
+    let time_val = TimeVal {
+        sec: time / 1_000_000,
+        usec: time % 1_000_000,
+    };
+    unsafe {
+        *ts = time_val;
+    }
     -1
 }
 
