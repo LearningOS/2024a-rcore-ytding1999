@@ -46,15 +46,20 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
     if _ts.is_null() {
         return -1;
     }
-    let time = get_time_in_us();
+    let time = get_time();
     let time_val = TimeVal {
         sec: time / 1_000_000,
         usec: time % 1_000_000,
     };
-    unsafe {
-        *ts = time_val;
+
+    let virtual_addr = VirtAddr::from(_ts as usize);
+    if let Some(physical_addr) = translate_va_to_pa(virtual_addr) {
+        let page_table = PageTable::from_token(physical_addr.token());
+        let mut page = page_table.get_page(physical_addr);
+        page.set_bytes(time_val);
     }
-    -1
+
+    0
 }
 
 /// YOUR JOB: Finish sys_task_info to pass testcases
