@@ -175,7 +175,12 @@ impl TaskManager {
 
     fn record_syscall_time(&self, syscall_id: usize) {}
 
-    fn schedule_mark(&self) {}
+    fn schedule_mark(&self) {
+        let inner = self.inner.exclusive_access();
+        let curr_id = inner.current_task;
+        if  !inner.tasks[curr_id].is_scheduled {
+        }
+    }
 }
 
 /// get the physical address from the virtual address

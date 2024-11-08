@@ -2,9 +2,7 @@
 use crate::{
     config::MAX_SYSCALL_NUM,
     task::*,
-    timer::{get_time, get_time_ms, get_time_us},
-    mm::PageTable,
-    mm::address::VirtAddr,
+    timer::get_time_us,
 };
 
 #[repr(C)]
@@ -85,4 +83,9 @@ pub fn sys_sbrk(size: i32) -> isize {
     } else {
         -1
     }
+}
+
+pub fn init_task_info(syscall_id: usize) {
+    schedule_mark();
+    record_syscall_time(syscall_id);
 }
