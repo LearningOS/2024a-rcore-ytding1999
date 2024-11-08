@@ -1,9 +1,7 @@
 //! Process management syscalls
 use crate::{
     config::MAX_SYSCALL_NUM,
-    task::{
-        change_program_brk, exit_current_and_run_next, suspend_current_and_run_next, TaskStatus,
-    },
+    task::*,
     timer::{get_time, get_time_ms, get_time_us},
     mm::PageTable,
     mm::address::VirtAddr,
@@ -49,19 +47,14 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
     if _ts.is_null() {
         return -1;
     }
+    let ts = get_physical_addr(_ts as *const usize) as *mut TimeVal;
     let time = get_time_us();
-    let time_val = TimeVal {
-        sec: time / 1_000_000,
-        usec: time % 1_000_000,
-    };
-
-    let virtual_addr = VirtAddr::from(_ts as usize);
-    if let Some(physical_addr) = translate_va_to_pa(virtual_addr) {
-        let page_table = PageTable::from_token(physical_addr.token());
-        let mut page = page_table.get_page(physical_addr);
-        page.set_bytes(time_val);
+    unsafe{
+        *ts = TimeVal {
+            sec: time / 1_000_000,
+            usec: time % 1_000_000,
+        };
     }
-
     0
 }
 

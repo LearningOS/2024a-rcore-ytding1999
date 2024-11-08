@@ -20,6 +20,8 @@ use crate::trap::TrapContext;
 use alloc::vec::Vec;
 use lazy_static::*;
 use switch::__switch;
+use mm::page_table::PageTable;
+use mm::address::{PhysAddr, VirtAddr};
 pub use task::{TaskControlBlock, TaskStatus};
 
 pub use context::TaskContext;
@@ -153,8 +155,29 @@ impl TaskManager {
             panic!("All applications completed!");
         }
     }
+
+    fn get_pa_from_va(&self, va: *const usize) -> usize {
+        let inner = self.inner.exclusive_access();
+        let page_table = PageTable::from_token(inner.tasks[inner.current_task].get_user_token());
+        let _va = VirtAddr::from(va);
+        let Some(pa) = page_table.find_pte(_va.clone().floor()).map(|pte| {
+            //println!("translate_va:va = {:?}", va);
+            let aligned_pa: PhysAddr = pte.ppn().into();
+            //println!("translate_va:pa_align = {:?}", aligned_pa);
+            let offset = _va.page_offset();
+            let aligned_pa_usize: usize = aligned_pa.into();
+            (aligned_pa_usize + offset).into()
+        }) else {
+            panic!("Failed to get physical address from virtual address");
+        };
+        pa
+    }
 }
 
+/// get the physical address from the virtual address
+pub fn get_physical_addr(va: *const usize) -> usize {
+    TASK_MANAGER.get_pa_from_va(va)
+}
 /// Run the first task in task list.
 pub fn run_first_task() {
     TASK_MANAGER.run_first_task();
