@@ -4,6 +4,9 @@ use crate::{
     task::{
         change_program_brk, exit_current_and_run_next, suspend_current_and_run_next, TaskStatus,
     },
+    timer::{get_time, get_time_ms, get_time_us},
+    mm::PageTable,
+    mm::address::VirtAddr,
 };
 
 #[repr(C)]
@@ -46,7 +49,7 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
     if _ts.is_null() {
         return -1;
     }
-    let time = get_time();
+    let time = get_time_us();
     let time_val = TimeVal {
         sec: time / 1_000_000,
         usec: time % 1_000_000,
