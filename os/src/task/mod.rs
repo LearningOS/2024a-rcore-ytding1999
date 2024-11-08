@@ -172,6 +172,10 @@ impl TaskManager {
         };
         pa
     }
+
+    fn record_syscall_time(&self, syscall_id: usize) {}
+
+    fn schedule_mark(&self) {}
 }
 
 /// get the physical address from the virtual address
@@ -224,4 +228,14 @@ pub fn current_trap_cx() -> &'static mut TrapContext {
 /// Change the current 'Running' task's program break
 pub fn change_program_brk(size: i32) -> Option<usize> {
     TASK_MANAGER.change_current_program_brk(size)
+}
+
+/// mark the schedule
+pub fn schedule_mark() {
+    TASK_MANAGER.schedule_mark();
+}
+
+/// record the syscall time
+pub fn record_syscall_time(syscall_id: usize) {
+    TASK_MANAGER.record_syscall_time(syscall_id);
 }
