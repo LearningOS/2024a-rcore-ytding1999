@@ -61,7 +61,14 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
 /// HINT: What if [`TaskInfo`] is splitted by two pages ?
 pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
     trace!("kernel: sys_task_info NOT IMPLEMENTED YET!");
-    -1
+    if _ti.is_null() {
+        return -1;
+    }
+    let ti = get_physical_addr(_ti as *const usize) as *mut TaskInfo;
+    unsafe{
+        *ti = get_task_info();
+    }
+    0
 }
 
 // YOUR JOB: Implement mmap.
@@ -75,6 +82,7 @@ pub fn sys_munmap(_start: usize, _len: usize) -> isize {
     trace!("kernel: sys_munmap NOT IMPLEMENTED YET!");
     -1
 }
+
 /// change data segment size
 pub fn sys_sbrk(size: i32) -> isize {
     trace!("kernel: sys_sbrk");

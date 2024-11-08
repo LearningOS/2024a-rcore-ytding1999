@@ -16,12 +16,15 @@ mod task;
 
 use crate::loader::{get_app_data, get_num_app};
 use crate::sync::UPSafeCell;
+use crate::timer::get_time_ms;
 use crate::trap::TrapContext;
+use crate::config::MAX_SYSCALL_NUM;
 use alloc::vec::Vec;
+pub use crate::syscall::process::TaskInfo;
 use lazy_static::*;
 use switch::__switch;
-use mm::page_table::PageTable;
-use mm::address::{PhysAddr, VirtAddr};
+pub use crate::mm::page_table::PageTable;
+pub use crate::mm::address::{PhysAddr, VirtAddr};
 pub use task::{TaskControlBlock, TaskStatus};
 
 pub use context::TaskContext;
@@ -156,7 +159,7 @@ impl TaskManager {
         }
     }
 
-    fn get_pa_from_va(&self, va: *const usize) -> usize {
+    pub fn get_pa_from_va(&self, va: *const usize) -> usize {
         let inner = self.inner.exclusive_access();
         let page_table = PageTable::from_token(inner.tasks[inner.current_task].get_user_token());
         let _va = VirtAddr::from(va);
@@ -173,14 +176,40 @@ impl TaskManager {
         pa
     }
 
-    fn record_syscall_time(&self, syscall_id: usize) {}
 
-    fn schedule_mark(&self) {
-        let inner = self.inner.exclusive_access();
+    pub fn schedule_mark(&self) {
+        let mut inner = self.inner.exclusive_access();
         let curr_id = inner.current_task;
-        if  !inner.tasks[curr_id].is_scheduled {
+        let current_task = &mut inner.tasks[curr_id];
+        if  !current_task.is_scheduled {
+            current_task.is_scheduled = true;
+            current_task.first_scheduled_time = get_time_ms();
         }
     }
+
+    
+    ///Todo
+    pub fn get_current_status(&self) -> TaskStatus {
+        let inner = self.inner.exclusive_access();
+        inner.tasks[inner.current_task].task_status
+    }
+    /// TODO
+    pub fn record_this_call(&self, syscall_id: usize) {
+        let mut inner = self.inner.exclusive_access();
+        let curr_task_id = inner.current_task;
+        inner.tasks[curr_task_id].syscall_times[syscall_id] += 1;
+    }
+    /// 获取当前任务的系统调用次数
+    pub fn get_currtask_syscall_time(&self) -> [u32; MAX_SYSCALL_NUM] {
+        let inner = self.inner.exclusive_access();
+        inner.tasks[inner.current_task].syscall_times
+    }
+    /// TODO
+    pub fn get_currtask_first_scheduled_time(&self) -> usize {
+        let inner = self.inner.exclusive_access();
+        inner.tasks[inner.current_task].first_scheduled_time
+    }
+
 }
 
 /// get the physical address from the virtual address
@@ -242,5 +271,25 @@ pub fn schedule_mark() {
 
 /// record the syscall time
 pub fn record_syscall_time(syscall_id: usize) {
-    TASK_MANAGER.record_syscall_time(syscall_id);
+    TASK_MANAGER.record_this_call(syscall_id);)
+}
+
+pub fn get_current_status() -> TaskStatus {
+    TASK_MANAGER.get_current_status()
+}
+
+pub fn get_currtask_first_scheduled_time() -> usize {
+    TASK_MANAGER.get_currtask_first_scheduled_time()
+}
+
+pub fn get_task_info() -> TaskInfo {
+    let _status = TASK_MANAGER.get_current_status();
+    let _syscall_times = TASK_MANAGER.get_currtask_syscall_time();
+    let _time = get_time_ms() - TASK_MANAGER.get_currtask_first_scheduled_time();
+    let res = TaskInfo {
+        status: _status,
+        syscall_times: _syscall_times,
+        time: _time
+    };
+    res
 }
