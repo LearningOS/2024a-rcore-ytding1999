@@ -25,6 +25,7 @@ use lazy_static::*;
 use switch::__switch;
 pub use crate::mm::page_table::PageTable;
 pub use crate::mm::address::{PhysAddr, VirtAddr};
+pub use crate::mm::*;
 pub use task::{TaskControlBlock, TaskStatus};
 
 pub use context::TaskContext;
@@ -158,8 +159,8 @@ impl TaskManager {
             panic!("All applications completed!");
         }
     }
-
-    pub fn get_pa_from_va(&self, va: *const usize) -> usize {
+    /// get pa from va
+    pub fn get_pa_from_va(&self, va: usize) -> usize {
         let inner = self.inner.exclusive_access();
         let page_table = PageTable::from_token(inner.tasks[inner.current_task].get_user_token());
         let _va = VirtAddr::from(va);
@@ -176,7 +177,7 @@ impl TaskManager {
         pa
     }
 
-
+    /// schedule mark
     pub fn schedule_mark(&self) {
         let mut inner = self.inner.exclusive_access();
         let curr_id = inner.current_task;
@@ -210,10 +211,51 @@ impl TaskManager {
         inner.tasks[inner.current_task].first_scheduled_time
     }
 
+    fn mmap(&self, start: usize, len: usize, prot: usize)->isize{
+        if (prot & 0x7 == 0) || (prot & !0x7 != 0) {
+            return -1
+        }
+        let mut right = MapPermission::U;
+        if prot & 0x1 == 0x1 {right = right | MapPermission::R;}
+        if prot & 0x2 == 0x2 {right = right | MapPermission::W;}
+        if prot & 0x4 == 0x4 {right = right | MapPermission::X;}
+        let mut inner = self.inner.exclusive_access();
+        let current_task = inner.current_task;
+        let memory_set = &mut (inner.tasks[current_task].memory_set);
+        let start_va = VirtAddr::from(start);
+        let end_va = VirtAddr::from(start+len);
+        
+        if memory_set.check_used(start_va, end_va) {
+            return -1;
+        } 
+        if start_va.0 & 0xfff != 0{
+            return -1;
+        }
+        memory_set.insert_framed_area(start_va, 
+            end_va, right);
+        0
+    }
+
+    fn munmap(&self, start: usize, len: usize)->isize{
+        let mut inner = self.inner.exclusive_access();
+        let current_task = inner.current_task;
+        let memory_set = &mut (inner.tasks[current_task].memory_set);
+        let start_va = VirtAddr::from(start);
+        let end_va = VirtAddr::from(start+len);
+        if memory_set.check_unused(start_va, end_va) {
+            return -1;
+        }
+        if start_va.0 & 0xfff != 0{
+            return -1;
+        }
+        memory_set.delete_area(start_va, end_va);
+        0
+    }
+
 }
 
 /// get the physical address from the virtual address
-pub fn get_physical_addr(va: *const usize) -> usize {
+pub fn get_physical_addr(va: usize) -> usize {
     TASK_MANAGER.get_pa_from_va(va)
 }
 /// Run the first task in task list.
@@ -271,17 +313,17 @@ pub fn schedule_mark() {
 
 /// record the syscall time
 pub fn record_syscall_time(syscall_id: usize) {
-    TASK_MANAGER.record_this_call(syscall_id);)
+    TASK_MANAGER.record_this_call(syscall_id);
 }
-
+/// 1
 pub fn get_current_status() -> TaskStatus {
     TASK_MANAGER.get_current_status()
 }
-
+/// 1
 pub fn get_currtask_first_scheduled_time() -> usize {
     TASK_MANAGER.get_currtask_first_scheduled_time()
 }
-
+/// 1
 pub fn get_task_info() -> TaskInfo {
     let _status = TASK_MANAGER.get_current_status();
     let _syscall_times = TASK_MANAGER.get_currtask_syscall_time();
@@ -292,4 +334,14 @@ pub fn get_task_info() -> TaskInfo {
         time: _time
     };
     res
+}
+
+/// 该函数用于开辟文件空间
+pub fn mmap(start: usize, len: usize, prot: usize)->isize{
+    TASK_MANAGER.mmap(start, len, prot)
+}
+
+/// 该函数用于释放文件空间
+pub fn munmap(start: usize, len: usize) -> isize {
+    TASK_MANAGER.munmap(start, len)
 }

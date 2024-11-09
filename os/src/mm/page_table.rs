@@ -3,18 +3,26 @@
 use super::{frame_alloc, FrameTracker, PhysPageNum, StepByOne, VirtAddr, VirtPageNum};
 use alloc::vec;
 use alloc::vec::Vec;
-use bitflags::*;
+use bitflags::bitflags;
 
 bitflags! {
     /// page table entry flags
     pub struct PTEFlags: u8 {
+        ///
         const V = 1 << 0;
+        ///
         const R = 1 << 1;
+        ///
         const W = 1 << 2;
+        ///
         const X = 1 << 3;
+        ///
         const U = 1 << 4;
+        ///
         const G = 1 << 5;
+        ///
         const A = 1 << 6;
+        ///
         const D = 1 << 7;
     }
 }
@@ -170,4 +178,20 @@ pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&
         start = end_va.into();
     }
     v
+}
+
+///1
+pub fn check_va_used(token: usize, vpn: VirtPageNum)->usize{
+    let page_table = PageTable::from_token(token);
+    // 若页面使用了返回1，否则返回0
+    match page_table.find_pte(vpn) {
+        Some(pte) => {
+            if !pte.is_valid() {
+                0
+            } else {
+                1
+            }
+        },
+        None => 0
+    }
 }

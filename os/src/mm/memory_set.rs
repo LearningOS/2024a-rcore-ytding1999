@@ -1,6 +1,6 @@
 //! Implementation of [`MapArea`] and [`MemorySet`].
 
-use super::{frame_alloc, FrameTracker};
+use super::{frame_alloc, FrameTracker, page_table::check_va_used};
 use super::{PTEFlags, PageTable, PageTableEntry};
 use super::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum};
 use super::{StepByOne, VPNRange};
@@ -63,6 +63,18 @@ impl MemorySet {
             None,
         );
     }
+    ///111
+    pub fn delete_area(&mut self, start_va: VirtAddr, _end_va: VirtAddr){
+        let start_vpn: VirtPageNum = start_va.floor();
+        // let end_vpn: VirtPageNum = end_va.ceil();
+        // let vpn_range = VPNRange::new(start_vpn, end_vpn);
+        for map_area in &mut self.areas {
+            if map_area.vpn_range.get_start().0 == start_vpn.0 {
+                map_area.unmap(&mut self.page_table);
+            }
+        }
+    }
+
     fn push(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
         map_area.map(&mut self.page_table);
         if let Some(data) = data {
@@ -261,6 +273,35 @@ impl MemorySet {
         } else {
             false
         }
+    }
+    ///23
+    pub fn check_used(&self, start_va: VirtAddr, end_va: VirtAddr)->bool{
+        let start_vpn: VirtPageNum = start_va.floor();
+        let end_vpn: VirtPageNum = end_va.ceil();
+        // println!("{:#x},{:#x}", start_vpn.0, end_vpn.0);
+        let vpn_range = VPNRange::new(start_vpn, end_vpn);
+        for vpn in vpn_range {
+            // println!("{:#x},{}", vpn.0, check_va_used(self.token(), vpn));
+            if check_va_used(self.token(), vpn) == 1 {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// 检查要删除的区域是否为空
+    pub fn check_unused(&self, start_va: VirtAddr, end_va: VirtAddr)->bool{
+        let start_vpn: VirtPageNum = start_va.floor();
+        let end_vpn: VirtPageNum = end_va.ceil();
+        // println!("{:#x},{:#x}", start_vpn.0, end_vpn.0);
+        let vpn_range = VPNRange::new(start_vpn, end_vpn);
+        for vpn in vpn_range {
+            // println!("{:#x},{}", vpn.0, check_va_used(self.token(), vpn));
+            if check_va_used(self.token(), vpn) == 0 {
+                return true;
+            }
+        }
+        false
     }
 }
 /// map area structure, controls a contiguous piece of virtual memory

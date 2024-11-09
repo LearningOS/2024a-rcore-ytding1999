@@ -7,8 +7,11 @@ use crate::{
 
 #[repr(C)]
 #[derive(Debug)]
+/// timeval
 pub struct TimeVal {
+    /// sec
     pub sec: usize,
+    /// usec
     pub usec: usize,
 }
 
@@ -16,11 +19,11 @@ pub struct TimeVal {
 #[allow(dead_code)]
 pub struct TaskInfo {
     /// Task status in it's life cycle
-    status: TaskStatus,
+    pub status: TaskStatus,
     /// The numbers of syscall called by task
-    syscall_times: [u32; MAX_SYSCALL_NUM],
+    pub syscall_times: [u32; MAX_SYSCALL_NUM],
     /// Total running time of task
-    time: usize,
+    pub time: usize,
 }
 
 /// task exits and submit an exit code
@@ -45,7 +48,7 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
     if _ts.is_null() {
         return -1;
     }
-    let ts = get_physical_addr(_ts as *const usize) as *mut TimeVal;
+    let ts = get_physical_addr(_ts as  usize) as *mut TimeVal;
     let time = get_time_us();
     unsafe{
         *ts = TimeVal {
@@ -64,23 +67,23 @@ pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
     if _ti.is_null() {
         return -1;
     }
-    let ti = get_physical_addr(_ti as *const usize) as *mut TaskInfo;
+    let ti = get_physical_addr(_ti as usize) as *mut TaskInfo;
     unsafe{
         *ti = get_task_info();
     }
     0
 }
 
-// YOUR JOB: Implement mmap.
+/// YOUR JOB: Implement mmap.
 pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
     trace!("kernel: sys_mmap NOT IMPLEMENTED YET!");
-    -1
+    mmap(_start, _len, _port)
 }
 
-// YOUR JOB: Implement munmap.
+/// YOUR JOB: Implement munmap.
 pub fn sys_munmap(_start: usize, _len: usize) -> isize {
     trace!("kernel: sys_munmap NOT IMPLEMENTED YET!");
-    -1
+    munmap(_start,_len)
 }
 
 /// change data segment size
@@ -93,6 +96,7 @@ pub fn sys_sbrk(size: i32) -> isize {
     }
 }
 
+/// document
 pub fn init_task_info(syscall_id: usize) {
     schedule_mark();
     record_syscall_time(syscall_id);
